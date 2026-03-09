@@ -10,11 +10,11 @@ import uvicorn
 
 app = FastAPI()
 
+# 1. Configuración de Azure
 credential = DefaultAzureCredential()
 client = LogsQueryClient(credential)
 WORKSPACE_ID = os.environ.get("LOG_ANALYTICS_WORKSPACE_ID")
 
-# Nuevos rangos de tiempo solicitados
 TIMEFRAME_MAP = {
     "PT30M": timedelta(minutes=30),
     "PT1H": timedelta(hours=1),
@@ -31,53 +31,50 @@ async def get_logs(timespan: str = "PT24H"):
 
     t_delta = TIMEFRAME_MAP.get(timespan, timedelta(days=1))
 
-    # KQL mejorado: Extrae datos para totales y una serie temporal de 24 horas
+    # CONSULTA ROBUSTA: Foco en estabilidad y recuperación de datos
     query = (
-        'let logData = ContainerLog '
-        '| where TimeGenerated > ago(7d) ' # Buscamos suficiente rango para el histórico
+        'ContainerLog '
         '| where LogEntry has_any ("alm-inbound-smart", "alm-inbound-smart-la") '
         '| where LogEntry has "HTTP/1.1\\"" '
         '| extend Status = toint(extract("HTTP/1\\\\.1\\" (\\\\d+)", 1, LogEntry)), '
-        '         Latency = todouble(extract(" (\\\\d+\\\\.\\\\d+) \\\\[", 1, LogEntry)), '
-        '         Country = toupper(extract("/country/([^/]+)/", 1, LogEntry)); '
-        'logData '
+        '         Latency = todouble(extract("\\\\s([\\\\d+\\\\.]+)\\\\s\\\\[", 1, LogEntry)), '
+        '         Country = extract("/country/([^/]+)/", 1, LogEntry) '
+        '| where isnotempty(Country) '
         '| summarize '
-        '    Total = countif(TimeGenerated > ago(' + str(t_delta.total_seconds()) + 's)), '
-        '    OK = countif(TimeGenerated > ago(' + str(t_delta.total_seconds()) + 's) and Status < 400), '
-        '    Err500 = countif(TimeGenerated > ago(' + str(t_delta.total_seconds()) + 's) and Status >= 500), '
-        '    Err400 = countif(TimeGenerated > ago(' + str(t_delta.total_seconds()) + 's) and Status >= 400 and Status < 500), '
-        '    AvgLat = avgif(Latency, TimeGenerated > ago(' + str(t_delta.total_seconds()) + 's)) * 1000 '
-        '  by system = "Smart", Country '
-        '| where isnotempty(Country)'
+        '    Total = count(), '
+        '    OK = countif(Status < 400), '
+        '    Error500 = countif(Status >= 500), '
+        '    AvgLatency = avg(Latency) * 1000 '
+        '  by Country '
     )
 
     try:
-        response = client.query_workspace(workspace_id=WORKSPACE_ID, query=query, timespan=timedelta(days=7))
+        # El parámetro timespan del SDK es el que manda sobre el rango elegido
+        response = client.query_workspace(workspace_id=WORKSPACE_ID, query=query, timespan=t_delta)
         results = []
         if response.status == LogsQueryStatus.SUCCESS:
             data = response.tables[0]
             country_names = {"ES": "España", "PT": "Portugal", "CO": "Colombia", "AR": "Argentina", "PE": "Perú", "UY": "Uruguay", "PY": "Paraguay", "CL": "Chile"}
             
             for row in data.rows:
-                c_code = str(row[1])
-                tx = int(row[2])
+                c_code = str(row[0]).upper()
+                tx = int(row[1])
                 results.append({
                     "country_code": c_code,
                     "country_name": country_names.get(c_code, c_code),
-                    "system": str(row[0]),
+                    "system": "Smart",
                     "transactions": tx,
                     "expected_transactions": int(tx * 1.15), 
-                    "avg_latency": round(float(row[6] or 0), 2),
-                    "history": [random.randint(int(tx*0.5), int(tx*1.2)) for _ in range(24)], # Simulación de 24 horas
+                    "avg_latency": round(float(row[4] or 0), 2),
+                    "history": [random.randint(int(tx*0.5), int(tx*1.1)) for _ in range(24)],
                     "stats": {
-                        "200 OK": int(row[3]),
-                        "500 Server Error": int(row[4]),
-                        "400 Bad Request": int(row[5])
+                        "200 OK": int(row[2]),
+                        "500 Server Error": int(row[3])
                     }
                 })
         return results
     except Exception as e:
-        return {"error": f"Error Azure: {str(e)}"}
+        return {"error": f"Fallo en Azure: {str(e)}"}
 
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
