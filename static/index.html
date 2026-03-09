@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NOC - Monitor de Integraciones</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Exo+2:wght@300;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background: #0b0c10; color: #c5c6c7; overflow: hidden; }
+        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; }
+        
+        .control-panel { 
+            position: absolute; top: 20px; left: 20px; z-index: 1000; 
+            background: rgba(11, 12, 16, 0.95); padding: 20px; 
+            border: 1px solid #1f2833; border-left: 4px solid #66fcf1; 
+            box-shadow: 10px 0 30px rgba(0,0,0,0.6); width: 320px; 
+            border-radius: 0 8px 8px 0; max-height: 85vh; overflow-y: auto;
+            transition: transform 0.3s ease, opacity 0.3s;
+        }
+        .control-panel.hidden { transform: translateX(-350px); opacity: 0; pointer-events: none; }
+        
+        .toggle-btn {
+            position: absolute; top: 25px; left: 25px; z-index: 1100;
+            background: #1f2833; color: #66fcf1; border: 1px solid #66fcf1;
+            padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 1.2em;
+        }
+
+        h3 { margin: 0 0 20px 0; color: #66fcf1; font-family: 'JetBrains Mono', monospace; border-bottom: 1px solid #45a29e; padding-bottom: 10px; font-size: 1.3em; text-transform: uppercase; }
+
+        .ticker-wrap { position: fixed; bottom: 0; width: 100%; height: 40px; background-color: #1f2833; z-index: 2000; border-top: 1px solid #66fcf1; display: flex; align-items: center; overflow: hidden; }
+        .ticker { display: flex; animation: ticker 85s linear infinite; white-space: nowrap; }
+        .ticker-item { padding: 0 40px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
+        @keyframes ticker { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+
+        .summary-box { background: #151a1e; padding: 18px; border-radius: 4px; border: 1px solid #333; margin-top: 15px; }
+        .summary-title { color: #66fcf1; font-size: 1.1em; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 5px; }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.2em; }
+        .val-ok { color: #66fcf1; font-weight: bold; }
+        .val-err { color: #ff0033; font-weight: bold; }
+
+        .legend-box { margin-top: 25px; padding-top: 15px; border-top: 1px solid #333; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.85em; color: #aaa; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; display: inline-block; }
+
+        .pulse-icon { position: relative; }
+        .pulse-dot { width: 10px; height: 10px; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .pulse-ring { width: 100%; height: 100%; border-radius: 50%; border: 2px solid; position: absolute; top: 0; left: 0; animation: pulsate 2s infinite ease-out; opacity: 0; }
+        @keyframes pulsate { 0% { transform: scale(0.1); opacity: 0.8; } 100% { transform: scale(2.0); opacity: 0; } }
+
+        .status-ok .pulse-dot { background: #66fcf1; box-shadow: 0 0 10px #66fcf1; } .status-ok .pulse-ring { border-color: #66fcf1; }
+        .status-error .pulse-dot { background: #ff0033; box-shadow: 0 0 10px #ff0033; } .status-error .pulse-ring { border-color: #ff0033; }
+        .status-warn .pulse-dot { background: #ffcc00; box-shadow: 0 0 10px #ffcc00; } .status-warn .pulse-ring { border-color: #ffcc00; }
+
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 12, 16, 0.9); display: flex; justify-content: center; align-items: center; z-index: 3000; color: #66fcf1; font-size: 1.2em; font-family: 'JetBrains Mono', monospace; }
+
+        .leaflet-popup-content-wrapper { background: #0b0c10; color: #fff; border: 1px solid #45a29e; font-family: 'Exo 2'; }
+        .sparkline-container { width: 100%; height: 50px; background: #151a1e; margin: 10px 0; border-radius: 4px; }
+        .sparkline-path { fill: none; stroke: #66fcf1; stroke-width: 2; }
+        .sparkline-area { fill: rgba(102, 252, 241, 0.1); }
+    </style>
+</head>
+<body>
+
+<div id="loading" class="loading-overlay">Sincronizando logs de producción...</div>
+
+<button class="toggle-btn" onclick="togglePanel()">☰</button>
+
+<div class="control-panel" id="sidePanel">
+    <h3>Monitor de Integraciones</h3>
+    
+    <div style="margin-bottom:15px">
+        <label style="color:#66fcf1; font-size:0.8em; font-weight:bold">RANGO DE TIEMPO</label>
+        <select id="timeframe" onchange="fetchData()" style="width:100%; padding:10px; background:#0b0c10; color:#fff; border:1px solid #45a29e; border-radius:4px; cursor:pointer;">
+            <option value="PT1H">Última Hora</option>
+            <option value="PT24H" selected>Últimas 24 Horas</option>
+            <option value="P7D">Últimos 7 Días</option>
+        </select>
+    </div>
+
+    <div class="summary-box">
+        <div class="summary-title">Datos Globales</div>
+        <div class="summary-row"><span>Transacciones:</span> <b id="sum-total">0</b></div>
+        <div class="summary-row"><span>Exitosas:</span> <b class="val-ok" id="sum-ok">0</b></div>
+        <div class="summary-row"><span>Errores (500):</span> <b class="val-err" id="sum-err">0</b></div>
+        <div class="summary-row" style="margin-top:10px; border-top:1px dashed #444; padding-top:10px;">
+            <span>Latencia Media:</span> <b id="sum-latency" style="color:#fff">0ms</b>
+        </div>
+    </div>
+
+    <div class="legend-box">
+        <div style="color:#66fcf1; font-size:0.85em; font-weight:bold; margin-bottom:10px;">GUÍA DE ESTADO</div>
+        <div class="legend-item"><span class="dot" style="background:#ff0033"></span> Error Crítico (>5%)</div>
+        <div class="legend-item"><span class="dot" style="background:#ffcc00"></span> Latencia Alta (>300ms)</div>
+        <div class="legend-item"><span class="dot" style="background:#66fcf1"></span> Operación Normal</div>
+        <div style="margin-top:15px; font-size:0.75em; font-style:italic; color:#777">
+            * Los datos se agrupan por CorrelationID para evitar duplicidad entre clústeres HA/LA.
+        </div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<div class="ticker-wrap"><div class="ticker" id="ticker-content"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<script>
+    let rawData = [];
+    const countriesConfig = {
+        "ES": [40.46, -3.74], "CO": [4.57, -74.29], "AR": [-38.41, -63.61], 
+        "PE": [-9.19, -75.01], "UY": [-32.52, -55.76], "PY": [-23.44, -58.44], 
+        "CL": [-35.67, -71.54], "PT": [39.39, -8.22]
+    };
+
+    var map = L.map('map', { center: [-10, -60], zoom: 3, zoomControl: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+    var layerGroup = L.layerGroup().addTo(map);
+
+    function togglePanel() {
+        document.getElementById('sidePanel').classList.toggle('hidden');
+    }
+
+    async function fetchData() {
+        document.getElementById('loading').style.display = 'flex';
+        try {
+            const timeframe = document.getElementById('timeframe').value;
+            const res = await fetch(`/api/GetLogs?timespan=${timeframe}`);
+            rawData = await res.json();
+            updateMap();
+        } catch (e) { console.error(e); }
+        document.getElementById('loading').style.display = 'none';
+    }
+
+    function makeSparkline(history) {
+        if (!history || history.length < 2) return "";
+        const w = 260, h = 50;
+        const max = Math.max(...history, 1);
+        let points = history.map((val, i) => `${(i / (history.length - 1)) * w},${h - (val / max) * h}`).join(" ");
+        return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+                <polyline points="${points}" class="sparkline-path" />
+                <polygon points="${points} ${w},${h} 0,${h}" class="sparkline-area" />
+                </svg>`;
+    }
+
+    function updateMap() {
+        layerGroup.clearLayers();
+        let gTotal = 0, gOk = 0, gErr = 0, gLatSum = 0, gLatCount = 0;
+        let alerts = [];
+
+        rawData.forEach(d => {
+            // SOLUCIÓN PULSO ÁFRICA: Solo pintar si el país está en nuestra configuración
+            if (!countriesConfig[d.country_code]) return;
+
+            const coords = countriesConfig[d.country_code];
+            const errRate = d.transactions > 0 ? d.stats["500 Server Error"] / d.transactions : 0;
+            const isCritical = errRate >= 0.05;
+            const isSlow = d.avg_latency > 300;
+
+            let stateClass = isCritical ? "status-error" : (isSlow ? "status-warn" : "status-ok");
+            if (isCritical) alerts.push(`⚠️ ERROR CRÍTICO EN ${d.country_name.toUpperCase()} (${(errRate*100).toFixed(1)}%)`);
+            if (isSlow) alerts.push(`🐢 LATENCIA ALTA EN ${d.country_name.toUpperCase()} (${Math.round(d.avg_latency)}ms)`);
+
+            const size = 15 + Math.log(d.transactions + 1) * 5;
+            const icon = L.divIcon({
+                html: `<div class="pulse-icon ${stateClass}" style="width:${size}px; height:${size}px;"><div class="pulse-ring"></div><div class="pulse-dot"></div></div>`,
+                className: '', iconSize: [size, size]
+            });
+
+            const popup = `
+                <div style="padding:5px">
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:10px">
+                        <b>${d.country_name}</b> <span style="font-size:0.8em; color:#66fcf1">SMART</span>
+                    </div>
+                    <div style="font-size:0.9em; line-height:1.6">
+                        Transacciones: <b>${d.transactions.toLocaleString()}</b><br>
+                        Latencia: <b style="color:${isSlow?'#ffcc00':'#fff'}">${Math.round(d.avg_latency)}ms</b><br>
+                        Tasa Error: <b style="color:${isCritical?'#ff0033':'#66fcf1'}">${(errRate*100).toFixed(1)}%</b>
+                    </div>
+                    <div class="sparkline-container">${makeSparkline(d.history)}</div>
+                </div>
+            `;
+
+            L.marker(coords, { icon }).bindPopup(popup).addTo(layerGroup);
+
+            gTotal += d.transactions; gOk += d.stats["200 OK"]; gErr += d.stats["500 Server Error"];
+            gLatSum += (d.avg_latency * d.transactions); gLatCount += d.transactions;
+        });
+
+        document.getElementById('sum-total').innerText = gTotal.toLocaleString();
+        document.getElementById('sum-ok').innerText = gOk.toLocaleString();
+        document.getElementById('sum-err').innerText = gErr.toLocaleString();
+        document.getElementById('sum-latency').innerText = (gLatCount > 0 ? Math.round(gLatSum/gLatCount) : 0) + "ms";
+
+        const tickDiv = document.getElementById('ticker-content');
+        if (alerts.length === 0) alerts.push("✅ INTEGRACIÓN SMART OPERANDO NORMALMENTE");
+        tickDiv.innerHTML = alerts.map(a => `<span class="ticker-item">${a}</span>`).join(" • ") + " • ";
+    }
+
+    fetchData();
+    setInterval(fetchData, 60000); 
+</script>
+</body>
+</html>
