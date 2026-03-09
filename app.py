@@ -27,28 +27,22 @@ async def get_logs(timespan: str = "PT24H"):
 
     t_delta = TIMEFRAME_MAP.get(timespan, timedelta(days=1))
 
-    # KQL OPTIMIZADO: Agrupa por CorrelationID para no perder rastro de flujos multi-componente
+    # QUERY RESILIENTE: Foco en Inbound para exactitud sin pérdida de datos
     query = (
-        'let smartTokens = dynamic(["alm-inbound", "apicra", "apicore", "facturador", "sgd"]); '
         'ContainerLog '
         '| where TimeGenerated > ago(24h) '
-        '| where LogEntry has_any (smartTokens) ' # Optimización de búsqueda rápida
+        '| where LogEntry has_any ("alm-inbound-smart", "alm-inbound-smart-la") '
+        '| where LogEntry has "HTTP/1.1\\"" ' # Filtramos solo logs de acceso (más fiables)
         '| extend Status = toint(extract("HTTP/1\\\\.1\\" (\\\\d+)", 1, LogEntry)), '
         '         Latency = todouble(extract(" (\\\\d+\\\\.\\\\d+) \\\\[", 1, LogEntry)), '
-        '         Country = extract("/country/([^/]+)/", 1, LogEntry), '
-        '         CorrID = extract("\\\\[([a-f0-9\\\\-]+)", 1, LogEntry) '
-        '| where isnotempty(CorrID) and isnotempty(Country) '
-        '| summarize '
-        '    MaxStatus = max(Status), '
-        '    MaxLatency = max(Latency), '
-        '    Country = take_any(Country) '
-        '  by CorrID ' # Deduplicamos: una transacción, una fila
+        '         Country = extract("/country/([^/]+)/", 1, LogEntry) '
+        '| where isnotempty(Country) '
         '| summarize '
         '    Total = count(), '
-        '    OK = countif(MaxStatus < 400), '
-        '    Error500 = countif(MaxStatus >= 500), '
-        '    Error400 = countif(MaxStatus >= 400 and MaxStatus < 500), '
-        '    AvgLatency = avg(MaxLatency) * 1000 '
+        '    OK = countif(Status < 400), '
+        '    Error500 = countif(Status >= 500), '
+        '    Error400 = countif(Status >= 400 and Status < 500), '
+        '    AvgLatency = avg(Latency) * 1000 '
         '  by system = "Smart", country_code = toupper(Country)'
     )
 

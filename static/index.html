@@ -9,7 +9,7 @@
     
     <style>
         body { margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background: #0b0c10; color: #c5c6c7; overflow: hidden; }
-        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; }
+        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; transition: width 0.3s; }
         
         .control-panel { 
             position: absolute; top: 20px; left: 20px; z-index: 1000; 
@@ -59,7 +59,6 @@
 
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 12, 16, 0.9); display: flex; justify-content: center; align-items: center; z-index: 3000; color: #66fcf1; font-size: 1.2em; font-family: 'JetBrains Mono', monospace; }
 
-        /* Toast Notificación */
         #update-toast { 
             position: fixed; bottom: 50px; right: 20px; z-index: 2500;
             background: rgba(31, 40, 51, 0.9); color: #66fcf1; 
@@ -124,11 +123,7 @@
 <script>
     let rawData = [];
     let isFirstLoad = true;
-    const countriesConfig = {
-        "ES": [40.46, -3.74], "CO": [4.57, -74.29], "AR": [-38.41, -63.61], 
-        "PE": [-9.19, -75.01], "UY": [-32.52, -55.76], "PY": [-23.44, -58.44], 
-        "CL": [-35.67, -71.54], "PT": [39.39, -8.22]
-    };
+    const countriesConfig = {"ES": [40.46, -3.74], "CO": [4.57, -74.29], "AR": [-38.41, -63.61], "PE": [-9.19, -75.01], "UY": [-32.52, -55.76], "PY": [-23.44, -58.44], "CL": [-35.67, -71.54], "PT": [39.39, -8.22]};
 
     var map = L.map('map', { center: [-10, -60], zoom: 3, zoomControl: false });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
@@ -152,7 +147,7 @@
     function showToast() {
         const toast = document.getElementById('update-toast');
         const now = new Date().toLocaleTimeString();
-        toast.innerText = `Sincronizado: ${now}`;
+        toast.innerText = `Actualizado: ${now}`;
         toast.style.display = 'block';
         setTimeout(() => { toast.style.display = 'none'; }, 5000);
     }
@@ -239,7 +234,7 @@
     }
 
     fetchData();
-    setInterval(fetchData, 300000); // 5 MINUTOS
+    setInterval(fetchData, 60000); // 1 MINUTO
 </script>
 </body>
 </html>
