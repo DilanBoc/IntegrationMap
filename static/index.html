@@ -9,8 +9,9 @@
     
     <style>
         body { margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background: #0b0c10; color: #c5c6c7; overflow: hidden; }
-        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; }
+        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; transition: width 0.3s; }
         
+        /* PANEL LATERAL */
         .control-panel { 
             position: absolute; top: 20px; left: 20px; z-index: 1000; 
             background: rgba(11, 12, 16, 0.95); padding: 20px; 
@@ -21,16 +22,27 @@
         }
         .control-panel.hidden { transform: translateX(-350px); opacity: 0; pointer-events: none; }
         
+        /* BOTÓN TOGGLE */
         .toggle-btn {
             position: absolute; top: 25px; left: 25px; z-index: 1100;
             background: #1f2833; color: #66fcf1; border: 1px solid #66fcf1;
             padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 1.2em;
         }
 
-        h3 { margin: 0 0 20px 0; color: #66fcf1; font-family: 'JetBrains Mono', monospace; border-bottom: 1px solid #45a29e; padding-bottom: 10px; font-size: 1.3em; text-transform: uppercase; }
+        /* AJUSTE: padding-left para no solapar con el botón ☰ */
+        h3 { 
+            margin: 0 0 20px 0; 
+            color: #66fcf1; 
+            font-family: 'JetBrains Mono', monospace; 
+            border-bottom: 1px solid #45a29e; 
+            padding-bottom: 10px; 
+            font-size: 1.3em; 
+            text-transform: uppercase;
+            padding-left: 45px; 
+        }
 
         .ticker-wrap { position: fixed; bottom: 0; width: 100%; height: 40px; background-color: #1f2833; z-index: 2000; border-top: 1px solid #66fcf1; display: flex; align-items: center; overflow: hidden; }
-        .ticker { display: flex; animation: ticker 85s linear infinite; white-space: nowrap; }
+        .ticker { display: flex; animation: ticker 85s linear infinite; white-space: nowrap; } 
         .ticker-item { padding: 0 40px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
         @keyframes ticker { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
@@ -91,8 +103,8 @@
 
     <div class="legend-box">
         <div style="color:#66fcf1; font-size:0.85em; font-weight:bold; margin-bottom:10px;">GUÍA DE ESTADO</div>
-        <div class="legend-item"><span class="dot" style="background:#ff0033"></span> Error Crítico (>5%)</div>
-        <div class="legend-item"><span class="dot" style="background:#ffcc00"></span> Latencia Alta (>300ms)</div>
+        <div class="legend-item"><span class="dot" style="background:#ff0033"></span> Error Crítico (>10%)</div>
+        <div class="legend-item"><span class="dot" style="background:#ffcc00"></span> Latencia Alta (>5s)</div>
         <div class="legend-item"><span class="dot" style="background:#66fcf1"></span> Operación Normal</div>
         <div style="margin-top:15px; font-size:0.75em; font-style:italic; color:#777">
             * Los datos se agrupan por CorrelationID para evitar duplicidad entre clústeres HA/LA.
@@ -149,17 +161,18 @@
         let alerts = [];
 
         rawData.forEach(d => {
-            // SOLUCIÓN PULSO ÁFRICA: Solo pintar si el país está en nuestra configuración
             if (!countriesConfig[d.country_code]) return;
 
             const coords = countriesConfig[d.country_code];
             const errRate = d.transactions > 0 ? d.stats["500 Server Error"] / d.transactions : 0;
-            const isCritical = errRate >= 0.05;
-            const isSlow = d.avg_latency > 300;
+            
+            // NUEVOS UMBRALES: Error >= 10% y Latencia > 5000ms (5s)
+            const isCritical = errRate >= 0.10;
+            const isSlow = d.avg_latency > 5000;
 
             let stateClass = isCritical ? "status-error" : (isSlow ? "status-warn" : "status-ok");
             if (isCritical) alerts.push(`⚠️ ERROR CRÍTICO EN ${d.country_name.toUpperCase()} (${(errRate*100).toFixed(1)}%)`);
-            if (isSlow) alerts.push(`🐢 LATENCIA ALTA EN ${d.country_name.toUpperCase()} (${Math.round(d.avg_latency)}ms)`);
+            if (isSlow) alerts.push(`🐢 LATENCIA ALTA EN ${d.country_name.toUpperCase()} (${(d.avg_latency/1000).toFixed(1)}s)`);
 
             const size = 15 + Math.log(d.transactions + 1) * 5;
             const icon = L.divIcon({
@@ -174,7 +187,7 @@
                     </div>
                     <div style="font-size:0.9em; line-height:1.6">
                         Transacciones: <b>${d.transactions.toLocaleString()}</b><br>
-                        Latencia: <b style="color:${isSlow?'#ffcc00':'#fff'}">${Math.round(d.avg_latency)}ms</b><br>
+                        Latencia: <b style="color:${isSlow?'#ffcc00':'#fff'}">${(d.avg_latency/1000).toFixed(2)}s</b><br>
                         Tasa Error: <b style="color:${isCritical?'#ff0033':'#66fcf1'}">${(errRate*100).toFixed(1)}%</b>
                     </div>
                     <div class="sparkline-container">${makeSparkline(d.history)}</div>
@@ -190,7 +203,9 @@
         document.getElementById('sum-total').innerText = gTotal.toLocaleString();
         document.getElementById('sum-ok').innerText = gOk.toLocaleString();
         document.getElementById('sum-err').innerText = gErr.toLocaleString();
-        document.getElementById('sum-latency').innerText = (gLatCount > 0 ? Math.round(gLatSum/gLatCount) : 0) + "ms";
+        
+        const globalLat = gLatCount > 0 ? (gLatSum/gLatCount/1000).toFixed(2) : 0;
+        document.getElementById('sum-latency').innerText = globalLat + "s";
 
         const tickDiv = document.getElementById('ticker-content');
         if (alerts.length === 0) alerts.push("✅ INTEGRACIÓN SMART OPERANDO NORMALMENTE");
