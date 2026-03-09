@@ -8,13 +8,23 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Exo+2:wght@300;600&display=swap" rel="stylesheet">
     
     <style>
-        body { margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background: #0b0c10; color: #c5c6c7; overflow: hidden; }
-        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; transition: width 0.3s; }
+        /* COLORES PROSEGUR */
+        :root {
+            --ps-yellow: #ffd100;
+            --ps-dark: #26292e;
+            --ps-black: #1a1c20;
+            --ps-text: #c5c6c7;
+            --ps-error: #ff0033;
+        }
+
+        body { margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background: var(--ps-black); color: var(--ps-text); overflow: hidden; }
+        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: var(--ps-black); transition: width 0.3s; }
         
+        /* PANEL LATERAL */
         .control-panel { 
             position: absolute; top: 20px; left: 20px; z-index: 1000; 
-            background: rgba(11, 12, 16, 0.95); padding: 20px; 
-            border: 1px solid #1f2833; border-left: 4px solid #66fcf1; 
+            background: rgba(38, 41, 46, 0.95); padding: 20px; 
+            border: 1px solid #444; border-left: 4px solid var(--ps-yellow); 
             box-shadow: 10px 0 30px rgba(0,0,0,0.6); width: 320px; 
             border-radius: 0 8px 8px 0; max-height: 85vh; overflow-y: auto;
             transition: transform 0.3s ease, opacity 0.3s;
@@ -23,26 +33,26 @@
         
         .toggle-btn {
             position: absolute; top: 25px; left: 25px; z-index: 1100;
-            background: #1f2833; color: #66fcf1; border: 1px solid #66fcf1;
+            background: var(--ps-dark); color: var(--ps-yellow); border: 1px solid var(--ps-yellow);
             padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 1.2em;
         }
 
         h3 { 
-            margin: 0 0 20px 0; color: #66fcf1; font-family: 'JetBrains Mono', monospace; 
-            border-bottom: 1px solid #45a29e; padding-bottom: 10px; font-size: 1.3em; 
+            margin: 0 0 20px 0; color: var(--ps-yellow); font-family: 'JetBrains Mono', monospace; 
+            border-bottom: 1px solid #444; padding-bottom: 10px; font-size: 1.3em; 
             text-transform: uppercase; padding-left: 45px; 
         }
 
-        .ticker-wrap { position: fixed; bottom: 0; width: 100%; height: 40px; background-color: #1f2833; z-index: 2000; border-top: 1px solid #66fcf1; display: flex; align-items: center; overflow: hidden; }
+        .ticker-wrap { position: fixed; bottom: 0; width: 100%; height: 40px; background-color: var(--ps-dark); z-index: 2000; border-top: 1px solid var(--ps-yellow); display: flex; align-items: center; overflow: hidden; }
         .ticker { display: flex; animation: ticker 85s linear infinite; white-space: nowrap; } 
         .ticker-item { padding: 0 40px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
         @keyframes ticker { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
 
-        .summary-box { background: #151a1e; padding: 18px; border-radius: 4px; border: 1px solid #333; margin-top: 15px; }
-        .summary-title { color: #66fcf1; font-size: 1.1em; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 5px; }
+        .summary-box { background: var(--ps-black); padding: 18px; border-radius: 4px; border: 1px solid #333; margin-top: 15px; }
+        .summary-title { color: var(--ps-yellow); font-size: 1.1em; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 5px; }
         .summary-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.2em; }
-        .val-ok { color: #66fcf1; font-weight: bold; }
-        .val-err { color: #ff0033; font-weight: bold; }
+        .val-ok { color: var(--ps-yellow); font-weight: bold; }
+        .val-err { color: var(--ps-error); font-weight: bold; }
 
         .legend-box { margin-top: 25px; padding-top: 15px; border-top: 1px solid #333; }
         .legend-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.85em; color: #aaa; }
@@ -53,29 +63,24 @@
         .pulse-ring { width: 100%; height: 100%; border-radius: 50%; border: 2px solid; position: absolute; top: 0; left: 0; animation: pulsate 2s infinite ease-out; opacity: 0; }
         @keyframes pulsate { 0% { transform: scale(0.1); opacity: 0.8; } 100% { transform: scale(2.0); opacity: 0; } }
 
-        .status-ok .pulse-dot { background: #66fcf1; box-shadow: 0 0 10px #66fcf1; } .status-ok .pulse-ring { border-color: #66fcf1; }
-        .status-error .pulse-dot { background: #ff0033; box-shadow: 0 0 10px #ff0033; } .status-error .pulse-ring { border-color: #ff0033; }
-        .status-warn .pulse-dot { background: #ffcc00; box-shadow: 0 0 10px #ffcc00; } .status-warn .pulse-ring { border-color: #ffcc00; }
+        .status-ok .pulse-dot { background: var(--ps-yellow); box-shadow: 0 0 10px var(--ps-yellow); } .status-ok .pulse-ring { border-color: var(--ps-yellow); }
+        .status-error .pulse-dot { background: var(--ps-error); box-shadow: 0 0 10px var(--ps-error); } .status-error .pulse-ring { border-color: var(--ps-error); }
+        .status-warn .pulse-dot { background: #ffaa00; box-shadow: 0 0 10px #ffaa00; } .status-warn .pulse-ring { border-color: #ffaa00; }
 
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 12, 16, 0.9); display: flex; justify-content: center; align-items: center; z-index: 3000; color: #66fcf1; font-size: 1.2em; font-family: 'JetBrains Mono', monospace; }
+        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(26, 28, 32, 0.95); display: flex; justify-content: center; align-items: center; z-index: 3000; color: var(--ps-yellow); font-size: 1.2em; font-family: 'JetBrains Mono', monospace; }
 
-        #update-toast { 
-            position: fixed; bottom: 50px; right: 20px; z-index: 2500;
-            background: rgba(31, 40, 51, 0.9); color: #66fcf1; 
-            padding: 8px 15px; border-radius: 4px; border: 1px solid #45a29e;
-            font-family: 'JetBrains Mono', monospace; font-size: 0.75em;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5); display: none;
-        }
+        #update-toast { position: fixed; bottom: 50px; right: 20px; z-index: 2500; background: var(--ps-dark); color: var(--ps-yellow); padding: 8px 15px; border-radius: 4px; border: 1px solid var(--ps-yellow); font-family: 'JetBrains Mono', monospace; font-size: 0.75em; box-shadow: 0 0 15px rgba(0,0,0,0.5); display: none; }
 
-        .leaflet-popup-content-wrapper { background: #0b0c10; color: #fff; border: 1px solid #45a29e; font-family: 'Exo 2'; }
-        .popup-header { display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 10px; }
-        .popup-tag { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: bold; }
+        .leaflet-popup-content-wrapper { background: var(--ps-dark); color: #fff; border: 1px solid var(--ps-yellow); font-family: 'Exo 2'; }
+        .popup-header { display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #444; padding-bottom: 8px; margin-bottom: 10px; }
+        .popup-tag { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: bold; border: 1px solid; }
         
-        .sparkline-container { width: 100%; height: 50px; background: #151a1e; margin: 10px 0; border-radius: 4px; }
-        .sparkline-path { fill: none; stroke: #66fcf1; stroke-width: 2; }
-        .sparkline-area { fill: rgba(102, 252, 241, 0.1); }
+        .sparkline-container { width: 100%; height: 50px; background: var(--ps-black); margin: 10px 0; border-radius: 4px; }
+        .sparkline-path { fill: none; stroke: var(--ps-yellow); stroke-width: 2; }
+        .sparkline-area { fill: rgba(255, 209, 0, 0.1); }
 
-        .anomaly-bar { display: flex; align-items: center; margin-top: 10px; }
+        select { width:100%; padding:10px; background:var(--ps-black); color:#fff; border:1px solid #444; border-radius:4px; cursor:pointer; font-family: 'Exo 2'; }
+        select:focus { border-color: var(--ps-yellow); outline: none; }
     </style>
 </head>
 <body>
@@ -89,10 +94,13 @@
     <h3>Monitor de Integraciones</h3>
     
     <div style="margin-bottom:15px">
-        <label style="color:#66fcf1; font-size:0.8em; font-weight:bold">RANGO DE TIEMPO</label>
-        <select id="timeframe" onchange="fetchData()" style="width:100%; padding:10px; background:#0b0c10; color:#fff; border:1px solid #45a29e; border-radius:4px; cursor:pointer;">
+        <label style="color:var(--ps-yellow); font-size:0.8em; font-weight:bold">RANGO DE TIEMPO</label>
+        <select id="timeframe" onchange="fetchData()">
+            <option value="PT30M">Últimos 30 Minutos</option>
             <option value="PT1H">Última Hora</option>
+            <option value="PT3H">Últimas 3 Horas</option>
             <option value="PT24H" selected>Últimas 24 Horas</option>
+            <option value="P3D">Últimos 3 Días</option>
             <option value="P7D">Últimos 7 Días</option>
         </select>
     </div>
@@ -108,10 +116,10 @@
     </div>
 
     <div class="legend-box">
-        <div style="color:#66fcf1; font-size:0.85em; font-weight:bold; margin-bottom:10px;">GUÍA DE ESTADO</div>
-        <div class="legend-item"><span class="dot" style="background:#ff0033"></span> Error Crítico (>10%)</div>
-        <div class="legend-item"><span class="dot" style="background:#ffcc00"></span> Latencia Alta (>5s)</div>
-        <div class="legend-item"><span class="dot" style="background:#66fcf1"></span> Operación Normal</div>
+        <div style="color:var(--ps-yellow); font-size:0.85em; font-weight:bold; margin-bottom:10px;">GUÍA DE ESTADO</div>
+        <div class="legend-item"><span class="dot" style="background:var(--ps-error)"></span> Error Crítico (>10%)</div>
+        <div class="legend-item"><span class="dot" style="background:#ffaa00"></span> Latencia Alta (>5s)</div>
+        <div class="legend-item"><span class="dot" style="background:var(--ps-yellow)"></span> Operación Normal</div>
     </div>
 </div>
 
@@ -169,7 +177,7 @@
         let alerts = [];
 
         rawData.forEach(d => {
-            if (!countriesConfig[d.country_code]) return; // Filtro Anti-África
+            if (!countriesConfig[d.country_code]) return; 
 
             const coords = countriesConfig[d.country_code];
             const errRate = d.transactions > 0 ? d.stats["500 Server Error"] / d.transactions : 0;
@@ -179,7 +187,7 @@
 
             let stateClass = isCritical ? "status-error" : (isSlow ? "status-warn" : "status-ok");
             let stateName = isCritical ? "CRITICAL" : (isSlow ? "SLOW" : "NORMAL");
-            let colorHex = isCritical ? "#ff0033" : (isSlow ? "#ffcc00" : "#66fcf1");
+            let colorHex = isCritical ? "#ff0033" : (isSlow ? "#ffaa00" : "#ffd100");
 
             if (isCritical) alerts.push(`⚠️ ERROR CRÍTICO EN ${d.country_name.toUpperCase()} (${(errRate*100).toFixed(1)}%)`);
             if (isSlow) alerts.push(`🐢 LATENCIA ALTA EN ${d.country_name.toUpperCase()} (${(d.avg_latency/1000).toFixed(1)}s)`);
@@ -193,7 +201,7 @@
             const popup = `
                 <div style="padding:5px; width:280px">
                     <div class="popup-header">
-                        <b>${d.country_name}</b> <span class="popup-tag" style="border:1px solid ${colorHex}; color:${colorHex}">${stateName}</span>
+                        <b style="color:var(--ps-yellow)">${d.country_name}</b> <span class="popup-tag" style="color:${colorHex}">${stateName}</span>
                     </div>
                     <div style="font-size:0.9em; margin-bottom:10px;">
                         <div style="display:flex; justify-content:space-between;"><span>Transacciones:</span> <b>${d.transactions.toLocaleString()}</b></div>
@@ -201,8 +209,8 @@
                         <div style="display:flex; justify-content:space-between;"><span style="color:#aaa">Errores (500):</span> <b class="val-err">${d.stats["500 Server Error"].toLocaleString()}</b></div>
                     </div>
                     <div style="display:flex; justify-content:space-between; margin-bottom:10px">
-                        <span>Latencia Media: <b style="color:${isSlow?'#ffcc00':'#fff'}">${(d.avg_latency/1000).toFixed(2)}s</b></span>
-                        <span>Tasa Error: <b style="color:${isCritical?'#ff0033':'#66fcf1'}">${(errRate*100).toFixed(1)}%</b></span>
+                        <span>Latencia Media: <b style="color:${isSlow?'#ffaa00':'#fff'}">${(d.avg_latency/1000).toFixed(2)}s</b></span>
+                        <span>Tasa Error: <b style="color:${isCritical?'#ff0033':'var(--ps-yellow)'}">${(errRate*100).toFixed(1)}%</b></span>
                     </div>
                     <div class="anomaly-bar">
                         <span style="font-size:0.8em; color:#aaa">Vol. Esperado:</span>
@@ -211,7 +219,7 @@
                         </div>
                         <span style="font-size:0.8em;">${Math.round(volRatio*100)}%</span>
                     </div>
-                    <div style="font-size:0.75em; color:#aaa; margin-top:15px; text-transform:uppercase; letter-spacing:1px">Volumen de peticiones últimos 60 minutos</div>
+                    <div style="font-size:0.75em; color:#aaa; margin-top:15px; text-transform:uppercase; letter-spacing:1px">Volumen de peticiones últimas 24 horas</div>
                     <div class="sparkline-container">${makeSparkline(d.history)}</div>
                 </div>
             `;
@@ -234,7 +242,7 @@
     }
 
     fetchData();
-    setInterval(fetchData, 60000); // 1 MINUTO
+    setInterval(fetchData, 60000); 
 </script>
 </body>
 </html>
