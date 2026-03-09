@@ -9,9 +9,8 @@
     
     <style>
         body { margin: 0; padding: 0; font-family: 'Exo 2', sans-serif; background: #0b0c10; color: #c5c6c7; overflow: hidden; }
-        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; transition: width 0.3s; }
+        #map { height: calc(100vh - 40px); width: 100%; z-index: 1; background: #0b0c10; }
         
-        /* PANEL LATERAL */
         .control-panel { 
             position: absolute; top: 20px; left: 20px; z-index: 1000; 
             background: rgba(11, 12, 16, 0.95); padding: 20px; 
@@ -22,23 +21,16 @@
         }
         .control-panel.hidden { transform: translateX(-350px); opacity: 0; pointer-events: none; }
         
-        /* BOTÓN TOGGLE */
         .toggle-btn {
             position: absolute; top: 25px; left: 25px; z-index: 1100;
             background: #1f2833; color: #66fcf1; border: 1px solid #66fcf1;
             padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 1.2em;
         }
 
-        /* AJUSTE: padding-left para no solapar con el botón ☰ */
         h3 { 
-            margin: 0 0 20px 0; 
-            color: #66fcf1; 
-            font-family: 'JetBrains Mono', monospace; 
-            border-bottom: 1px solid #45a29e; 
-            padding-bottom: 10px; 
-            font-size: 1.3em; 
-            text-transform: uppercase;
-            padding-left: 45px; 
+            margin: 0 0 20px 0; color: #66fcf1; font-family: 'JetBrains Mono', monospace; 
+            border-bottom: 1px solid #45a29e; padding-bottom: 10px; font-size: 1.3em; 
+            text-transform: uppercase; padding-left: 45px; 
         }
 
         .ticker-wrap { position: fixed; bottom: 0; width: 100%; height: 40px; background-color: #1f2833; z-index: 2000; border-top: 1px solid #66fcf1; display: flex; align-items: center; overflow: hidden; }
@@ -67,15 +59,30 @@
 
         .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 12, 16, 0.9); display: flex; justify-content: center; align-items: center; z-index: 3000; color: #66fcf1; font-size: 1.2em; font-family: 'JetBrains Mono', monospace; }
 
+        /* Toast Notificación */
+        #update-toast { 
+            position: fixed; bottom: 50px; right: 20px; z-index: 2500;
+            background: rgba(31, 40, 51, 0.9); color: #66fcf1; 
+            padding: 8px 15px; border-radius: 4px; border: 1px solid #45a29e;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.75em;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5); display: none;
+        }
+
         .leaflet-popup-content-wrapper { background: #0b0c10; color: #fff; border: 1px solid #45a29e; font-family: 'Exo 2'; }
+        .popup-header { display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 10px; }
+        .popup-tag { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; font-weight: bold; }
+        
         .sparkline-container { width: 100%; height: 50px; background: #151a1e; margin: 10px 0; border-radius: 4px; }
         .sparkline-path { fill: none; stroke: #66fcf1; stroke-width: 2; }
         .sparkline-area { fill: rgba(102, 252, 241, 0.1); }
+
+        .anomaly-bar { display: flex; align-items: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div id="loading" class="loading-overlay">Sincronizando logs de producción...</div>
+<div id="update-toast"></div>
 
 <button class="toggle-btn" onclick="togglePanel()">☰</button>
 
@@ -106,9 +113,6 @@
         <div class="legend-item"><span class="dot" style="background:#ff0033"></span> Error Crítico (>10%)</div>
         <div class="legend-item"><span class="dot" style="background:#ffcc00"></span> Latencia Alta (>5s)</div>
         <div class="legend-item"><span class="dot" style="background:#66fcf1"></span> Operación Normal</div>
-        <div style="margin-top:15px; font-size:0.75em; font-style:italic; color:#777">
-            * Los datos se agrupan por CorrelationID para evitar duplicidad entre clústeres HA/LA.
-        </div>
     </div>
 </div>
 
@@ -119,6 +123,7 @@
 <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
 <script>
     let rawData = [];
+    let isFirstLoad = true;
     const countriesConfig = {
         "ES": [40.46, -3.74], "CO": [4.57, -74.29], "AR": [-38.41, -63.61], 
         "PE": [-9.19, -75.01], "UY": [-32.52, -55.76], "PY": [-23.44, -58.44], 
@@ -129,19 +134,27 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
     var layerGroup = L.layerGroup().addTo(map);
 
-    function togglePanel() {
-        document.getElementById('sidePanel').classList.toggle('hidden');
-    }
+    function togglePanel() { document.getElementById('sidePanel').classList.toggle('hidden'); }
 
     async function fetchData() {
-        document.getElementById('loading').style.display = 'flex';
+        if (isFirstLoad) document.getElementById('loading').style.display = 'flex';
         try {
             const timeframe = document.getElementById('timeframe').value;
             const res = await fetch(`/api/GetLogs?timespan=${timeframe}`);
             rawData = await res.json();
             updateMap();
+            showToast();
+            isFirstLoad = false;
         } catch (e) { console.error(e); }
         document.getElementById('loading').style.display = 'none';
+    }
+
+    function showToast() {
+        const toast = document.getElementById('update-toast');
+        const now = new Date().toLocaleTimeString();
+        toast.innerText = `Sincronizado: ${now}`;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 5000);
     }
 
     function makeSparkline(history) {
@@ -161,16 +174,18 @@
         let alerts = [];
 
         rawData.forEach(d => {
-            if (!countriesConfig[d.country_code]) return;
+            if (!countriesConfig[d.country_code]) return; // Filtro Anti-África
 
             const coords = countriesConfig[d.country_code];
             const errRate = d.transactions > 0 ? d.stats["500 Server Error"] / d.transactions : 0;
-            
-            // NUEVOS UMBRALES: Error >= 10% y Latencia > 5000ms (5s)
             const isCritical = errRate >= 0.10;
             const isSlow = d.avg_latency > 5000;
+            const volRatio = d.expected_transactions > 0 ? d.transactions / d.expected_transactions : 1;
 
             let stateClass = isCritical ? "status-error" : (isSlow ? "status-warn" : "status-ok");
+            let stateName = isCritical ? "CRITICAL" : (isSlow ? "SLOW" : "NORMAL");
+            let colorHex = isCritical ? "#ff0033" : (isSlow ? "#ffcc00" : "#66fcf1");
+
             if (isCritical) alerts.push(`⚠️ ERROR CRÍTICO EN ${d.country_name.toUpperCase()} (${(errRate*100).toFixed(1)}%)`);
             if (isSlow) alerts.push(`🐢 LATENCIA ALTA EN ${d.country_name.toUpperCase()} (${(d.avg_latency/1000).toFixed(1)}s)`);
 
@@ -181,15 +196,27 @@
             });
 
             const popup = `
-                <div style="padding:5px">
-                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #333; padding-bottom:5px; margin-bottom:10px">
-                        <b>${d.country_name}</b> <span style="font-size:0.8em; color:#66fcf1">SMART</span>
+                <div style="padding:5px; width:280px">
+                    <div class="popup-header">
+                        <b>${d.country_name}</b> <span class="popup-tag" style="border:1px solid ${colorHex}; color:${colorHex}">${stateName}</span>
                     </div>
-                    <div style="font-size:0.9em; line-height:1.6">
-                        Transacciones: <b>${d.transactions.toLocaleString()}</b><br>
-                        Latencia: <b style="color:${isSlow?'#ffcc00':'#fff'}">${(d.avg_latency/1000).toFixed(2)}s</b><br>
-                        Tasa Error: <b style="color:${isCritical?'#ff0033':'#66fcf1'}">${(errRate*100).toFixed(1)}%</b>
+                    <div style="font-size:0.9em; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between;"><span>Transacciones:</span> <b>${d.transactions.toLocaleString()}</b></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#aaa">Exitosas (200 OK):</span> <b class="val-ok">${d.stats["200 OK"].toLocaleString()}</b></div>
+                        <div style="display:flex; justify-content:space-between;"><span style="color:#aaa">Errores (500):</span> <b class="val-err">${d.stats["500 Server Error"].toLocaleString()}</b></div>
                     </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px">
+                        <span>Latencia Media: <b style="color:${isSlow?'#ffcc00':'#fff'}">${(d.avg_latency/1000).toFixed(2)}s</b></span>
+                        <span>Tasa Error: <b style="color:${isCritical?'#ff0033':'#66fcf1'}">${(errRate*100).toFixed(1)}%</b></span>
+                    </div>
+                    <div class="anomaly-bar">
+                        <span style="font-size:0.8em; color:#aaa">Vol. Esperado:</span>
+                        <div style="flex-grow:1; height:6px; background:#333; margin:0 10px; border-radius:3px; position:relative">
+                            <div style="width:${Math.min(100, Math.round(volRatio*100))}%; height:100%; background:${colorHex}; border-radius:3px"></div>
+                        </div>
+                        <span style="font-size:0.8em;">${Math.round(volRatio*100)}%</span>
+                    </div>
+                    <div style="font-size:0.75em; color:#aaa; margin-top:15px; text-transform:uppercase; letter-spacing:1px">Volumen de peticiones últimos 60 minutos</div>
                     <div class="sparkline-container">${makeSparkline(d.history)}</div>
                 </div>
             `;
@@ -203,7 +230,6 @@
         document.getElementById('sum-total').innerText = gTotal.toLocaleString();
         document.getElementById('sum-ok').innerText = gOk.toLocaleString();
         document.getElementById('sum-err').innerText = gErr.toLocaleString();
-        
         const globalLat = gLatCount > 0 ? (gLatSum/gLatCount/1000).toFixed(2) : 0;
         document.getElementById('sum-latency').innerText = globalLat + "s";
 
@@ -213,7 +239,7 @@
     }
 
     fetchData();
-    setInterval(fetchData, 60000); 
+    setInterval(fetchData, 300000); // 5 MINUTOS
 </script>
 </body>
 </html>
